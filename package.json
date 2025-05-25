@@ -1,0 +1,20 @@
+{
+  "name": "geminipro",
+  "version": "1.0.0",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "copy-webpack-plugin": "^13.0.0",
+    "firebase": "^11.8.1",
+    "webpack": "^5.99.9",
+    "webpack-cli": "^6.0.1"
+  }
+}

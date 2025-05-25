@@ -1,0 +1,368 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  background-color: #d0d0d0; /* Background for the browser popup area */
+  color: #333;
+  overflow: hidden; /* Prevent scrollbars on body */
+}
+
+#app-container {
+  width: 789px; /* Adjusted width for tab layout */
+  height: 574px; /* Fixed height for the popup */
+  display: flex;
+  flex-direction: column;
+  background-color: #f0f0f0; /* Main app background - content area */
+  border-radius: 8px; /* Rounded corners for the entire app */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  margin: 5px; /* Small margin if popup doesn't fill */
+}
+
+/* Tab Bar Styling */
+#tab-bar {
+  display: flex;
+  align-items: center;
+  padding: 5px 5px 0 5px; /* Padding around the tab bar, no bottom padding */
+  background-color: #e0e0e0; /* Slightly darker background for tab bar */
+  border-bottom: 1px solid #b0b0b0;
+  flex-shrink: 0; /* Prevent tab bar from shrinking */
+  border-top-left-radius: 8px; /* Match app container */
+  border-top-right-radius: 8px; /* Match app container */
+}
+
+#tabs-list {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center; /* Align items vertically, including action buttons */
+  overflow-x: auto; /* Allow horizontal scrolling for many tabs */
+  flex-grow: 1;
+}
+
+#tabs-list::-webkit-scrollbar {
+  height: 3px;
+}
+#tabs-list::-webkit-scrollbar-thumb {
+  background: #a0a0a0;
+}
+
+#tabs-list li:not(.tab-action-button) { /* Styles for note tabs */
+  padding: 10px 15px;
+  cursor: pointer;
+  border: 1px solid #b0b0b0;
+  border-bottom: none; /* Remove bottom border for tab effect */
+  margin-right: -1px; /* Overlap borders */
+  background-color: #d5d5d5;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+  font-size: 0.9em;
+  white-space: nowrap; /* Prevent tab titles from wrapping */
+  max-width: 100px; /* Max width for a tab */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative; /* For active tab indicator */
+}
+
+#tabs-list li:not(.tab-action-button):hover {
+  background-color: #c8c8c8;
+}
+
+#tabs-list li:not(.tab-action-button).active {
+  background-color: #f0f0f0; /* Same as content area background */
+  border-bottom-color: #f0f0f0; /* Make it look connected */
+  font-weight: bold;
+  z-index: 1; /* Bring active tab to front */
+}
+
+/* Styles for action buttons (New Note, User/Settings) within the tabs list */
+#tabs-list li.tab-action-button {
+  padding: 6px 8px; /* Adjusted padding for a more compact button look */
+  margin-left: 4px; /* Space from other tabs or each other */
+  cursor: pointer;
+  background-color: transparent; /* No background, icon-like */
+  border: none; /* No borders like tabs */
+  font-size: 1.2em; /* Icon size */
+  color: #555;
+  border-radius: 4px; /* Slight rounding for button feel */
+  display: flex; /* To center icon if needed */
+  align-items: center;
+  justify-content: center;
+  /* order: 100; /* Pushes to the end if mixed with dynamically added note tabs, ensure they are added after note tabs in JS or use flex order */
+}
+
+#tabs-list li.tab-action-button:hover {
+  background-color: #c0c0c0; /* Hover effect */
+  color: #222;
+}
+
+/* Old #new-tab-button, #user-icon styles are now handled by .tab-action-button */
+
+/* New Email/Password Auth Section Styles */
+#auth-section {
+  padding: 20px;
+  display: flex; 
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; 
+  flex-grow: 1; 
+  background-color: #f0f0f0; 
+  border-radius: 8px; 
+}
+
+#email-auth-forms form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; 
+  width: 100%;
+  max-width: 320px; 
+  padding: 20px; 
+  background-color: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
+}
+
+#email-auth-forms h3 {
+  text-align: center;
+  margin-top: 0; 
+  margin-bottom: 18px; 
+  color: #333;
+  font-size: 1.4em; 
+}
+
+#email-auth-forms input[type="email"],
+#email-auth-forms input[type="password"] {
+  padding: 12px; 
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+  box-sizing: border-box; 
+}
+#email-auth-forms input[type="email"]:focus,
+#email-auth-forms input[type="password"]:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+  outline: none;
+}
+
+
+#email-auth-forms button[type="submit"] {
+  padding: 12px 15px; 
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+#email-auth-forms button[type="submit"]:hover {
+  background-color: #0056b3;
+}
+
+.auth-toggle-link {
+  text-align: center;
+  font-size: 0.9em;
+  margin-top: 10px; 
+}
+
+.auth-toggle-link a {
+  color: #007bff;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-toggle-link a:hover {
+  text-decoration: underline;
+}
+
+/* User Status in Tab Bar (when logged in) - This div is now mostly empty or can be removed */
+#user-status-in-tab-bar {
+  display: flex; 
+  align-items: center;
+  gap: 10px; 
+  margin-left: auto; 
+  padding: 0 8px; 
+  font-size: 0.9em; 
+}
+
+/* #user-email-display is removed from HTML, so this style is no longer needed */
+/*
+#user-email-display {
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px; 
+}
+*/
+
+/* #signout-button is removed from HTML (replaced by #logout-button in user-info-panel) */
+/*
+#signout-button {
+  background: none;
+  border: 1px solid #ccc; 
+  color: #dc3545; 
+  cursor: pointer;
+  font-size: 0.85em; 
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+#signout-button:hover {
+  background-color: #f8f9fa; 
+  border-color: #dc3545;
+}
+*/
+
+/* Main App Content (when logged in) */
+#main-app-content {
+  display: flex; 
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: hidden; 
+}
+
+/* Note Editor Area */
+#note-editor-area {
+  padding: 15px;
+  flex-grow: 1; 
+  display: flex;
+  flex-direction: column;
+  background-color: #f0f0f0; 
+  border-bottom-left-radius: 8px; 
+  border-bottom-right-radius: 8px; 
+}
+
+#note-title {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1.1em;
+  box-sizing: border-box;
+  flex-grow: 1; 
+}
+
+#title-actions-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px; 
+  gap: 8px; 
+}
+
+#title-actions-bar #note-title {
+  margin-bottom: 0; 
+}
+
+#title-actions-bar .action-span { 
+  padding: 6px 8px; 
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em; 
+  font-weight: 500;
+  transition: color 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* #save-note-action is removed from HTML */
+/*
+#save-note-action {
+  color: #007bff; 
+}
+#save-note-action:hover {
+  color: #0056b3; 
+  text-decoration: underline;
+}
+*/
+
+#delete-note-action {
+  color: #dc3545; 
+}
+#delete-note-action:hover {
+  color: #c82333; 
+  text-decoration: underline;
+}
+
+#note-content {
+  width: calc(100% - 16px); 
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+  flex-grow: 1; 
+  resize: none; 
+  box-sizing: border-box;
+}
+
+#note-title:focus,
+#note-content:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+  outline: none;
+}
+
+#status-message {
+  padding: 8px;
+  text-align: center;
+  font-size: 0.9em;
+  color: green;
+  background-color: #e6ffe6;
+  border-top: 1px solid #cce8cc;
+  display: none; 
+  flex-shrink: 0;
+}
+
+/* User Info Panel Styles */
+#user-info-panel {
+  padding: 20px;
+  background-color: #e8e8e8; 
+  border-top: 1px solid #b0b0b0; /* Optional: if it appears below tab bar */
+  /* If it replaces note-editor-area, it might not need top border if main-app-content handles separation */
+  border-bottom-left-radius: 8px; 
+  border-bottom-right-radius: 8px; 
+  flex-grow: 1; 
+  display: none; /* Hidden by default, shown by JS */
+  flex-direction: column;
+  align-items: center; 
+  justify-content: center; 
+  box-sizing: border-box; /* Ensure padding is included in height */
+}
+
+#user-info-panel h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.3em;
+}
+
+#user-info-panel p {
+  margin-bottom: 20px;
+  font-size: 1em;
+  color: #444;
+}
+
+#user-info-email {
+  font-weight: bold;
+  color: #0056b3;
+}
+
+#user-info-panel #logout-button { 
+  padding: 10px 20px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95em;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+}
+
+#user-info-panel #logout-button:hover {
+  background-color: #c82333;
+}
