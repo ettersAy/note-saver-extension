@@ -1,87 +1,65 @@
-// Import Firebase modules using ES6 import syntax
-import { initializeApp } from 'firebase/app';
+// Firebase serverTimestamp can be imported if needed for other direct uses,
+// but firebaseService.js handles it for its operations.
+// For now, assuming it's not directly needed in popup.js after refactoring.
+// import { serverTimestamp } from 'firebase/firestore'; 
+
+// Import Firebase services
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  setDoc,
-  getDoc, // Added for fetching user profile
-  deleteDoc,
-  query,
-  orderBy,
-  serverTimestamp,
-  where
-} from 'firebase/firestore';
+  db, // db might not be directly used if all operations go via service functions
+  auth, // auth might not be directly used if all operations go via service functions
+  addNote,
+  updateNote,
+  deleteNoteById,
+  loadNotesForUser,
+  signUpUser,
+  signInUser,
+  signOutUser,
+  onAuthChange,
+  getUserProfile,
+  createUserProfile
+} from './src/firebaseService.js';
+
+// Import DOM elements
 import {
-  getAuth,
-  createUserWithEmailAndPassword, // Added
-  signInWithEmailAndPassword,   // Added
-  signOut,
-  onAuthStateChanged
-  // GoogleAuthProvider, signInWithPopup removed
-} from 'firebase/auth';
+  noteTitleInput,
+  noteContentInput,
+  newNoteTabButton,
+  userSettingsTabButton,
+  deleteNoteAction,
+  tabsListUL,
+  statusMessageSpan,
+  noteEditorArea,
+  userInfoPanel,
+  userInfoEmail,
+  logoutButton,
+  authSection,
+  mainAppContent,
+  signupForm,
+  signupEmailInput,
+  signupPasswordInput,
+  loginForm,
+  loginEmailInput,
+  loginPasswordInput,
+  showLoginLink,
+  showSignupLink,
+  userStatusInTabBar
+} from './src/domElements.js';
+
+// Import UI manager functions
+import {
+  showStatus,
+  // formatTimestamp, // No longer directly used in popup.js after uiManager refactor
+  renderTabs,
+  loadNoteIntoEditor,
+  clearEditorFields,
+  toggleAuthFormsDisplay,
+  updateAppUIForAuthState,
+  displayNotesUnavailableMessage
+} from './src/uiManager.js';
 
 document.addEventListener('DOMContentLoaded', function () {
-  // DOM Elements - Main App
-  const noteTitleInput = document.getElementById('note-title');
-  const noteContentInput = document.getElementById('note-content');
-  // const saveNoteAction = document.getElementById('save-note-action'); // Removed for auto-save
-  const newNoteTabButton = document.getElementById('new-note-tab-button'); // Renamed from new-tab-button
-  const userSettingsTabButton = document.getElementById('user-settings-tab-button'); // Added
-  const deleteNoteAction = document.getElementById('delete-note-action');
-  const tabsListUL = document.getElementById('tabs-list');
-  const statusMessageSpan = document.getElementById('status-message');
-  const noteEditorArea = document.getElementById('note-editor-area'); // Added for toggling
-
-  // DOM Elements - User Info Panel
-  const userInfoPanel = document.getElementById('user-info-panel'); // Added
-  const userInfoEmail = document.getElementById('user-info-email'); // Added
-  const logoutButton = document.getElementById('logout-button'); // Added
-
-  // DOM Elements - Auth
-  const authSection = document.getElementById('auth-section');
-  const mainAppContent = document.getElementById('main-app-content');
-
-  const signupForm = document.getElementById('signup-form');
-  const signupEmailInput = document.getElementById('signup-email');
-  const signupPasswordInput = document.getElementById('signup-password');
-
-  const loginForm = document.getElementById('login-form');
-  const loginEmailInput = document.getElementById('login-email');
-  const loginPasswordInput = document.getElementById('login-password');
-
-  const showLoginLink = document.getElementById('show-login-link');
-  const showSignupLink = document.getElementById('show-signup-link');
-
-  const userStatusInTabBar = document.getElementById('user-status-in-tab-bar'); // This div might be empty or repurposed
-  // const userEmailDisplayInTabBar = document.getElementById('user-email-display'); // Removed from HTML and JS logic
-
-  // Firebase Config
-  const firebaseConfig = {
-    apiKey: "AIzaSyBGRymo2BuynPL1wm1AWuoMY46CGm18nhs",
-    authDomain: "note-taker-3a957.firebaseapp.com",
-    projectId: "note-taker-3a957",
-    storageBucket: "note-taker-3a957.firebasestorage.app",
-    messagingSenderId: "689493935947",
-    appId: "1:689493935947:web:d508278603ec186ef58ace",
-    measurementId: "G-NHEG6W50QB"
-  };
-
-  // Initialize Firebase
-  let app;
-  let db;
-  let auth; // Firebase Auth instance
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-  } catch (error) {
-    console.error("Firebase initialization error:", error);
-    showStatus('Error initializing Firebase!', 0, true);
-    return;
-  }
+  // Firebase instances (db, auth) are now imported from firebaseService.js
+  // and initialized there.
 
   let notesCache = {};
   let openTabs = [];
@@ -101,102 +79,20 @@ document.addEventListener('DOMContentLoaded', function () {
     };
   }
 
-  function showStatus(message, duration = 2000, isError = false) {
-    statusMessageSpan.textContent = message;
-    statusMessageSpan.style.color = isError ? 'red' : 'green';
-    statusMessageSpan.style.display = 'block';
-    if (duration > 0) {
-      setTimeout(() => {
-        statusMessageSpan.textContent = '';
-        statusMessageSpan.style.display = 'none';
-      }, duration);
-    }
-  }
-
-  function formatTimestamp(timestamp) {
-    if (!timestamp || !timestamp.toDate) {
-      return 'Not saved yet';
-    }
-    return timestamp.toDate().toLocaleString();
-  }
+  // showStatus is now imported from uiManager.js
+  // formatTimestamp is now in uiManager.js and used by uiManager.renderTabs
 
   // --- Core Tab & Note Functions ---
 
   function renderTabsAndEditor() {
-    renderTabs();
-    loadNoteIntoEditor(activeTabId);
+    // Use functions from uiManager, passing necessary state and callbacks
+    renderTabs(openTabs, activeTabId, notesCache, handleTabSwitch);
+    loadNoteIntoEditor(activeTabId, openTabs, notesCache);
   }
 
-  function renderTabs() {
-    const currentActiveIdForRender = activeTabId; // Preserve active tab ID for this render cycle
-    // Clear only note tabs, not action buttons if they were part of this UL (they are now separate li)
-    const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-    noteTabElements.forEach(el => el.remove());
-
-    openTabs.forEach(tab => {
-      const li = document.createElement('li');
-      li.textContent = tab.title || 'Untitled';
-      li.dataset.noteId = tab.id;
-      if (tab.id === currentActiveIdForRender) {
-        li.classList.add('active');
-      }
-
-      if (tab.id.startsWith('temp_id_')) {
-        li.title = 'Not saved yet';
-      } else {
-        const note = notesCache[tab.id];
-        li.title = `Last modified: ${formatTimestamp(note?.timestamp)}`;
-      }
-
-      li.addEventListener('click', () => handleTabSwitch(tab.id));
-      // Insert before the first action button or append if no action buttons
-      const firstActionButton = tabsListUL.querySelector('.tab-action-button');
-      if (firstActionButton) {
-        tabsListUL.insertBefore(li, firstActionButton);
-      } else {
-        tabsListUL.appendChild(li);
-      }
-    });
-  }
-
-
-  function loadNoteIntoEditor(noteId) {
-    if (!noteId) {
-      clearEditorFields();
-      deleteNoteAction.style.pointerEvents = 'none';
-      deleteNoteAction.style.opacity = '0.5';
-      return;
-    }
-
-    const tabData = openTabs.find(t => t.id === noteId);
-    if (!tabData) {
-        clearEditorFields();
-        return;
-    }
-
-    if (noteId.startsWith('temp_id_')) {
-      noteTitleInput.value = tabData.title === 'Untitled' ? '' : tabData.title;
-      noteContentInput.value = '';
-      deleteNoteAction.style.pointerEvents = 'none';
-      deleteNoteAction.style.opacity = '0.5';
-    } else {
-      const note = notesCache[noteId];
-      if (note) {
-        noteTitleInput.value = note.title || '';
-        noteContentInput.value = note.content || '';
-        deleteNoteAction.style.pointerEvents = 'auto';
-        deleteNoteAction.style.opacity = '1';
-      } else {
-        console.warn(`Note ${noteId} not found in cache for editor.`);
-        clearEditorFields();
-      }
-    }
-  }
-
-  function clearEditorFields() {
-    noteTitleInput.value = '';
-    noteContentInput.value = '';
-  }
+  // renderTabs is now imported from uiManager.js
+  // loadNoteIntoEditor is now imported from uiManager.js
+  // clearEditorFields is now imported from uiManager.js
 
   function handleTabSwitch(noteId) {
     if (noteId === activeTabId) return;
@@ -238,30 +134,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
   async function loadInitialNotes() {
-    if (!db || !currentUid || !currentUserIsActive) {
-        const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-        noteTabElements.forEach(el => el.remove()); // Clear only note tabs
-        const liMessage = document.createElement('li');
-        liMessage.style.padding = '10px';
-        liMessage.style.color = '#777';
-        liMessage.textContent = 'Notes unavailable.';
-        const firstActionButton = tabsListUL.querySelector('.tab-action-button');
-        if (firstActionButton) {
-            tabsListUL.insertBefore(liMessage, firstActionButton);
-        } else {
-            tabsListUL.appendChild(liMessage);
-        }
+    // db instance is from firebaseService; check currentUid and currentUserIsActive
+    if (!currentUid || !currentUserIsActive) {
+        displayNotesUnavailableMessage(); // Use uiManager function
         notesCache = {};
         openTabs = [];
         activeTabId = null;
-        clearEditorFields();
+        clearEditorFields(); // Use uiManager function
         return;
     }
 
     try {
-      const notesCollectionRef = collection(db, "notes");
-      const q = query(notesCollectionRef, where("userId", "==", currentUid), orderBy("timestamp", "desc"));
-      const querySnapshot = await getDocs(q);
+      // Use firebaseService to load notes
+      const querySnapshot = await loadNotesForUser(currentUid);
 
       notesCache = {};
       openTabs = [];
@@ -287,7 +172,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function saveCurrentNote() {
-    if (!db || !activeTabId || !currentUid || !currentUserIsActive) {
+    // db instance is from firebaseService; check activeTabId, currentUid, currentUserIsActive
+    if (!activeTabId || !currentUid || !currentUserIsActive) {
       // Do not show status for auto-save, it can be annoying if it happens often
       console.log('Save skipped: User not signed in, inactive, or no active tab.');
       return;
@@ -298,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const noteData = {
       title: title,
       content: content,
-      timestamp: serverTimestamp(),
+      // timestamp is handled by firebaseService
       userId: currentUid
     };
 
@@ -306,33 +192,34 @@ document.addEventListener('DOMContentLoaded', function () {
       let currentTabInOpenTabs = openTabs.find(t => t.id === activeTabId);
 
       if (activeTabId.startsWith('temp_id_')) {
-        const docRef = await addDoc(collection(db, "notes"), noteData);
+        const docRef = await addNote(noteData); // Use firebaseService
         const newFirestoreId = docRef.id;
+        // For cache, simulate a timestamp or fetch the note again if exact timestamp is crucial
         notesCache[newFirestoreId] = { ...noteData, id: newFirestoreId, timestamp: { toDate: () => new Date() } };
         if(currentTabInOpenTabs) {
             currentTabInOpenTabs.id = newFirestoreId;
             currentTabInOpenTabs.title = title;
         }
         activeTabId = newFirestoreId;
-        showStatus('Note saved!', 1500); // Briefer message for auto-save
+        showStatus('Note saved!', 1500);
       } else {
-        const noteRef = doc(db, "notes", activeTabId);
-        await setDoc(noteRef, noteData, { merge: true });
+        await updateNote(activeTabId, noteData); // Use firebaseService
         notesCache[activeTabId] = { ...notesCache[activeTabId], ...noteData, timestamp: { toDate: () => new Date() } };
         if(currentTabInOpenTabs) {
             currentTabInOpenTabs.title = title;
         }
-        showStatus('Note updated!', 1500); // Briefer message for auto-save
+        showStatus('Note updated!', 1500);
       }
       renderTabsAndEditor();
     } catch (error) {
-      console.error("Error saving note (auto-save): ", error);
-      showStatus('Error auto-saving. Check console.', 3000, true);
+      console.error("Error saving note: ", error); // Removed (auto-save) from log
+      showStatus('Error saving note. Check console.', 3000, true);
     }
   }
 
   async function deleteCurrentNote() {
-    if (!db || !activeTabId) {
+    // db instance is from firebaseService; check activeTabId
+    if (!activeTabId) {
       showStatus('No active note to delete.', 3000, true);
       return;
     }
@@ -347,8 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     try {
       if (!tabToDeleteId.startsWith('temp_id_')) {
-        const noteRef = doc(db, "notes", tabToDeleteId);
-        await deleteDoc(noteRef);
+        await deleteNoteById(tabToDeleteId); // Use firebaseService
         delete notesCache[tabToDeleteId];
       }
 
@@ -374,73 +260,8 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // --- Auth UI Management ---
-  function toggleAuthFormsDisplay(showLogin) {
-    if (showLogin) {
-      loginForm.style.display = 'block';
-      signupForm.style.display = 'none';
-    } else {
-      loginForm.style.display = 'none';
-      signupForm.style.display = 'block';
-    }
-  }
-
-  function updateAppUIForAuthState(user, profile) {
-    if (user && profile && profile.isActive) {
-      authSection.style.display = 'none';
-      mainAppContent.style.display = 'flex';
-      userStatusInTabBar.style.display = 'flex'; // This div is mostly empty now
-
-      noteTitleInput.disabled = false;
-      noteContentInput.disabled = false;
-      newNoteTabButton.disabled = false;
-      userSettingsTabButton.style.display = 'list-item'; // Or 'inline-block' based on final CSS for li
-      noteEditorArea.style.display = 'block'; // Ensure editor is visible
-      userInfoPanel.style.display = 'none'; // Ensure user panel is hidden
-    } else if (user && profile && !profile.isActive) {
-      authSection.style.display = 'none';
-      mainAppContent.style.display = 'flex';
-      userStatusInTabBar.style.display = 'flex';
-      
-      const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-      noteTabElements.forEach(el => el.remove());
-      const liMessage = document.createElement('li');
-      liMessage.style.padding = '10px';
-      liMessage.style.color = '#777';
-      liMessage.textContent = 'Your account is inactive. Please contact admin.';
-      const firstActionButton = tabsListUL.querySelector('.tab-action-button');
-      if (firstActionButton) {
-          tabsListUL.insertBefore(liMessage, firstActionButton);
-      } else {
-          tabsListUL.appendChild(liMessage);
-      }
-      notesCache = {}; openTabs = []; activeTabId = null; clearEditorFields();
-
-      noteTitleInput.disabled = true;
-      noteContentInput.disabled = true;
-      deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
-      newNoteTabButton.disabled = true;
-      userSettingsTabButton.style.display = 'list-item'; // Still show for logout
-      noteEditorArea.style.display = 'block'; // Or hide if preferred for inactive
-      userInfoPanel.style.display = 'none';
-      showStatus('Account inactive.', 0, true);
-    } else { // Logged out
-      authSection.style.display = 'block';
-      mainAppContent.style.display = 'none';
-      userStatusInTabBar.style.display = 'none';
-      toggleAuthFormsDisplay(true);
-
-      const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-      noteTabElements.forEach(el => el.remove());
-      notesCache = {}; openTabs = []; activeTabId = null; clearEditorFields();
-      noteTitleInput.disabled = true;
-      noteContentInput.disabled = true;
-      deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
-      newNoteTabButton.disabled = true;
-      userSettingsTabButton.style.display = 'none';
-      noteEditorArea.style.display = 'block'; // Reset
-      userInfoPanel.style.display = 'none'; // Reset
-    }
-  }
+  // toggleAuthFormsDisplay is now imported from uiManager.js
+  // updateAppUIForAuthState is now imported from uiManager.js
 
   // --- Auth Event Handlers ---
   async function handleSignUp(event) {
@@ -452,16 +273,15 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await signUpUser(email, password); // Use firebaseService
       const user = userCredential.user;
-      const userProfile = {
+      const userProfile = { // createdAt is handled by firebaseService
         email: user.email,
         uid: user.uid,
         role: "client",
-        isActive: true,
-        createdAt: serverTimestamp()
+        isActive: true
       };
-      await setDoc(doc(db, "users", user.uid), userProfile);
+      await createUserProfile(user.uid, userProfile); // Use firebaseService
       showStatus('Account created! Please login.', 3000);
       signupForm.reset();
       toggleAuthFormsDisplay(true);
@@ -476,7 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const email = loginEmailInput.value;
     const password = loginPasswordInput.value;
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await signInUser(email, password); // Use firebaseService
       showStatus('Logged in successfully!', 2000);
       loginForm.reset();
     } catch (error) {
@@ -487,28 +307,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function handleSignOut() {
     try {
-      await signOut(auth);
+      await signOutUser(); // Use firebaseService
       showStatus('Signed out successfully.', 2000);
-      // onAuthStateChanged will handle UI updates
+      // onAuthChange callback will handle UI updates
     } catch (error) {
       console.error("Error signing out: ", error);
       showStatus(`Sign-out error: ${error.message}`, 0, true);
     }
   }
 
-  // --- onAuthStateChanged Listener ---
-  onAuthStateChanged(auth, async (user) => {
+  // --- onAuthStateChanged Listener (now using onAuthChange from service) ---
+  onAuthChange(async (user) => {
     if (user) {
       currentUid = user.uid;
       currentUserEmail = user.email; // Store email
       try {
-        const userDocRef = doc(db, "users", user.uid);
-        const docSnap = await getDoc(userDocRef);
+        const docSnap = await getUserProfile(user.uid); // Use firebaseService
         if (docSnap.exists()) {
           const profile = docSnap.data();
           currentUserRole = profile.role || "client";
           currentUserIsActive = typeof profile.isActive === 'boolean' ? profile.isActive : true;
-          updateAppUIForAuthState(user, profile);
+          // Call uiManager's updateAppUIForAuthState, passing necessary state
+          updateAppUIForAuthState(user, profile, notesCache, openTabs, activeTabId);
           if (currentUserIsActive) {
             loadInitialNotes();
           }
@@ -516,27 +336,33 @@ document.addEventListener('DOMContentLoaded', function () {
           console.warn("User profile not found in Firestore for UID:", user.uid);
           currentUserRole = "client";
           currentUserIsActive = true;
-          const userProfileData = { email: user.email, uid: user.uid, role: "client", isActive: true, createdAt: serverTimestamp() };
-          await setDoc(doc(db, "users", user.uid), userProfileData, { merge: true });
-          updateAppUIForAuthState(user, userProfileData); // Pass the newly created profile
-          if (currentUserIsActive) loadInitialNotes(); // Load notes after profile creation
+          const userProfileData = { email: user.email, uid: user.uid, role: "client", isActive: true };
+          await createUserProfile(user.uid, userProfileData); 
+          updateAppUIForAuthState(user, userProfileData, notesCache, openTabs, activeTabId);
+          if (currentUserIsActive) loadInitialNotes();
           showStatus('User profile created.', 2000);
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("Error fetching/creating user profile:", error);
         currentUserRole = "client"; currentUserIsActive = false;
-        updateAppUIForAuthState(user, { isActive: false, email: user.email }); // Pass email for display
-        showStatus('Error fetching user profile.', 0, true);
+        updateAppUIForAuthState(user, { isActive: false, email: user.email }, notesCache, openTabs, activeTabId);
+        showStatus('Error with user profile.', 0, true);
       }
     } else {
       currentUid = null;
       currentUserEmail = null;
       currentUserRole = null;
       currentUserIsActive = false;
-      updateAppUIForAuthState(null, null);
+      // Clear state before updating UI for logged-out user
+      notesCache = {}; 
+      openTabs = []; 
+      activeTabId = null;
+      clearEditorFields();
+      updateAppUIForAuthState(null, null, notesCache, openTabs, activeTabId);
       showStatus('Please sign in or sign up.', 0);
-      userInfoPanel.style.display = 'none';
-      noteEditorArea.style.display = 'block';
+      // These might be redundant if updateAppUIForAuthState handles them for null user
+      // userInfoPanel.style.display = 'none'; 
+      // noteEditorArea.style.display = 'block';
     }
   });
 
