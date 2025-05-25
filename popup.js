@@ -57,18 +57,22 @@ import {
   displayNotesUnavailableMessage
 } from './src/uiManager.js';
 
-document.addEventListener('DOMContentLoaded', function () {
-  // Firebase instances (db, auth) are now imported from firebaseService.js
-  // and initialized there.
+// Import State Manager functions
+import {
+  getNotesCache, setNotesCache, updateNoteInCache, removeNoteFromCache,
+  getOpenTabs, setOpenTabs, addOpenTab, removeOpenTabById, updateOpenTab,
+  getActiveTabId, setActiveTabId,
+  // getTempIdCounter, // Not directly used, generateTempId is preferred
+  generateTempId,
+  getCurrentUid, getCurrentUserEmail, getCurrentUserRole, isCurrentUserActive, setCurrentUser,
+  resetUserState, resetNotesState
+} from './src/stateManager.js';
 
-  let notesCache = {};
-  let openTabs = [];
-  let activeTabId = null;
-  let tempIdCounter = 0;
-  let currentUid = null;
-  let currentUserEmail = null; // Store user email
-  let currentUserRole = null;
-  let currentUserIsActive = false;
+document.addEventListener('DOMContentLoaded', function () {
+  // Firebase instances are imported from firebaseService.js
+  // State variables are now managed by stateManager.js
+
+  // Local non-state variables (like timeouts) can remain
   let autoSaveTimeout = null; // For debouncing auto-save
 
   // --- Utility Functions ---
@@ -85,28 +89,26 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- Core Tab & Note Functions ---
 
   function renderTabsAndEditor() {
-    // Use functions from uiManager, passing necessary state and callbacks
-    renderTabs(openTabs, activeTabId, notesCache, handleTabSwitch);
-    loadNoteIntoEditor(activeTabId, openTabs, notesCache);
+    // Use functions from uiManager, passing necessary state (via getters) and callbacks
+    renderTabs(getOpenTabs(), getActiveTabId(), getNotesCache(), handleTabSwitch);
+    loadNoteIntoEditor(getActiveTabId(), getOpenTabs(), getNotesCache());
   }
 
-  // renderTabs is now imported from uiManager.js
-  // loadNoteIntoEditor is now imported from uiManager.js
-  // clearEditorFields is now imported from uiManager.js
+  // renderTabs, loadNoteIntoEditor, clearEditorFields are imported from uiManager.js
 
   function handleTabSwitch(noteId) {
-    if (noteId === activeTabId) return;
+    if (noteId === getActiveTabId()) return; // Use getter
      // If user info panel is visible, hide it and show editor
     if (userInfoPanel.style.display === 'block') {
         userInfoPanel.style.display = 'none';
         noteEditorArea.style.display = 'block'; // Or 'flex'
     }
-    activeTabId = noteId;
+    setActiveTabId(noteId); // Use setter
     renderTabsAndEditor();
   }
 
   function handleNewTab() {
-    if (!currentUid || !currentUserIsActive) {
+    if (!getCurrentUid() || !isCurrentUserActive()) { // Use getters
       showStatus('Please sign in and have an active account to create notes.', 3000, true);
       return;
     }
@@ -116,16 +118,16 @@ document.addEventListener('DOMContentLoaded', function () {
         noteEditorArea.style.display = 'block'; // Or 'flex'
     }
 
-    const newTempId = `temp_id_${tempIdCounter++}`;
-    openTabs.push({ id: newTempId, title: 'Untitled' });
-    activeTabId = newTempId;
+    const newTempId = generateTempId(); // Use stateManager function
+    addOpenTab({ id: newTempId, title: 'Untitled' }); // Use stateManager function
+    setActiveTabId(newTempId); // Use stateManager function
     renderTabsAndEditor();
     noteTitleInput.focus();
     showStatus('New note tab created.', 1500);
   }
 
   const autoSaveNote = debounce(async () => {
-    if (activeTabId && currentUid && currentUserIsActive) { // Only save if there's an active tab and user is valid
+    if (getActiveTabId() && getCurrentUid() && isCurrentUserActive()) { // Use getters
       await saveCurrentNote();
     } else {
       console.log('Auto-save skipped: No active tab, user not signed in, or user inactive.');
@@ -134,34 +136,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
   async function loadInitialNotes() {
-    // db instance is from firebaseService; check currentUid and currentUserIsActive
-    if (!currentUid || !currentUserIsActive) {
-        displayNotesUnavailableMessage(); // Use uiManager function
-        notesCache = {};
-        openTabs = [];
-        activeTabId = null;
-        clearEditorFields(); // Use uiManager function
+    if (!getCurrentUid() || !isCurrentUserActive()) { // Use getters
+        displayNotesUnavailableMessage();
+        resetNotesState(); // Clear notesCache, openTabs, activeTabId via stateManager
+        clearEditorFields();
         return;
     }
 
     try {
-      // Use firebaseService to load notes
-      const querySnapshot = await loadNotesForUser(currentUid);
+      const querySnapshot = await loadNotesForUser(getCurrentUid()); // Use getter
 
-      notesCache = {};
-      openTabs = [];
-
+      const newNotesCache = {};
+      const newOpenTabs = [];
       querySnapshot.forEach((doc) => {
         const noteData = { id: doc.id, ...doc.data() };
-        notesCache[doc.id] = noteData;
-        openTabs.push({ id: noteData.id, title: noteData.title });
+        newNotesCache[doc.id] = noteData;
+        newOpenTabs.push({ id: noteData.id, title: noteData.title });
       });
+      setNotesCache(newNotesCache); // Use setter
+      setOpenTabs(newOpenTabs); // Use setter
 
-      if (openTabs.length > 0) {
-        activeTabId = openTabs[0].id;
+      if (getOpenTabs().length > 0) { // Use getter
+        setActiveTabId(getOpenTabs()[0].id); // Use getter and setter
       } else {
-        activeTabId = null;
-        handleNewTab(); // Open one empty new tab if no notes exist
+        setActiveTabId(null); // Use setter
+        handleNewTab(); 
       }
       renderTabsAndEditor();
 
@@ -172,83 +171,83 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   async function saveCurrentNote() {
-    // db instance is from firebaseService; check activeTabId, currentUid, currentUserIsActive
-    if (!activeTabId || !currentUid || !currentUserIsActive) {
-      // Do not show status for auto-save, it can be annoying if it happens often
+    const currentActiveTabId = getActiveTabId(); // Use getter
+    if (!currentActiveTabId || !getCurrentUid() || !isCurrentUserActive()) { // Use getters
       console.log('Save skipped: User not signed in, inactive, or no active tab.');
       return;
     }
     const title = noteTitleInput.value.trim() || 'Untitled';
     const content = noteContentInput.value.trim();
 
-    const noteData = {
+    const noteToSave = {
       title: title,
       content: content,
-      // timestamp is handled by firebaseService
-      userId: currentUid
+      userId: getCurrentUid() // Use getter
     };
 
     try {
-      let currentTabInOpenTabs = openTabs.find(t => t.id === activeTabId);
-
-      if (activeTabId.startsWith('temp_id_')) {
-        const docRef = await addNote(noteData); // Use firebaseService
+      if (currentActiveTabId.startsWith('temp_id_')) {
+        const docRef = await addNote(noteToSave); 
         const newFirestoreId = docRef.id;
-        // For cache, simulate a timestamp or fetch the note again if exact timestamp is crucial
-        notesCache[newFirestoreId] = { ...noteData, id: newFirestoreId, timestamp: { toDate: () => new Date() } };
-        if(currentTabInOpenTabs) {
-            currentTabInOpenTabs.id = newFirestoreId;
-            currentTabInOpenTabs.title = title;
-        }
-        activeTabId = newFirestoreId;
+        const newNoteForCache = { ...noteToSave, id: newFirestoreId, timestamp: { toDate: () => new Date() } };
+        updateNoteInCache(newNoteForCache); // Use stateManager
+        // Update the tab ID from temp to newFirestoreId and title in openTabs
+        updateOpenTab(currentActiveTabId, { id: newFirestoreId, title: title });
+        setActiveTabId(newFirestoreId); // Use setter
         showStatus('Note saved!', 1500);
       } else {
-        await updateNote(activeTabId, noteData); // Use firebaseService
-        notesCache[activeTabId] = { ...notesCache[activeTabId], ...noteData, timestamp: { toDate: () => new Date() } };
-        if(currentTabInOpenTabs) {
-            currentTabInOpenTabs.title = title;
+        await updateNote(currentActiveTabId, noteToSave);
+        const updatedNoteForCache = { ...getNotesCache()[currentActiveTabId], ...noteToSave, timestamp: { toDate: () => new Date() } };
+        updateNoteInCache(updatedNoteForCache); // Use stateManager
+        // Update title in openTabs if it changed
+        const tabInOpenTabs = getOpenTabs().find(t => t.id === currentActiveTabId);
+        if (tabInOpenTabs && tabInOpenTabs.title !== title) {
+            updateOpenTab(currentActiveTabId, { title: title });
         }
         showStatus('Note updated!', 1500);
       }
       renderTabsAndEditor();
     } catch (error) {
-      console.error("Error saving note: ", error); // Removed (auto-save) from log
+      console.error("Error saving note: ", error);
       showStatus('Error saving note. Check console.', 3000, true);
     }
   }
 
   async function deleteCurrentNote() {
-    // db instance is from firebaseService; check activeTabId
-    if (!activeTabId) {
+    const currentActiveTabId = getActiveTabId(); // Use getter
+    if (!currentActiveTabId) {
       showStatus('No active note to delete.', 3000, true);
       return;
     }
-    // If user info panel is visible, hide it and show editor
     if (userInfoPanel.style.display === 'block') {
         userInfoPanel.style.display = 'none';
         noteEditorArea.style.display = 'block';
     }
 
-    const tabToDeleteId = activeTabId;
-    const tabIndex = openTabs.findIndex(t => t.id === tabToDeleteId);
+    const tabToDeleteId = currentActiveTabId;
+    // No need for tabIndex directly if using stateManager functions to modify openTabs
 
     try {
       if (!tabToDeleteId.startsWith('temp_id_')) {
-        await deleteNoteById(tabToDeleteId); // Use firebaseService
-        delete notesCache[tabToDeleteId];
+        await deleteNoteById(tabToDeleteId);
+        removeNoteFromCache(tabToDeleteId); // Use stateManager
       }
 
-      openTabs.splice(tabIndex, 1);
+      removeOpenTabById(tabToDeleteId); // Use stateManager
 
-      if (openTabs.length === 0) {
-        activeTabId = null;
+      const currentOpenTabs = getOpenTabs(); // Use getter
+      if (currentOpenTabs.length === 0) {
+        setActiveTabId(null); // Use setter
         handleNewTab();
       } else {
-        if (tabIndex >= openTabs.length) {
-          activeTabId = openTabs[openTabs.length - 1].id;
-        } else {
-          activeTabId = openTabs[tabIndex].id;
+        // Determine new active tab; if deleted tab was last, select new last, else select same index
+        const oldTabIndex = getOpenTabs().findIndex(t => t.id === tabToDeleteId); // Re-find index in potentially modified list for logic
+                                                                                // This logic might need refinement based on desired UX
+        let newActiveIndex = oldTabIndex;
+        if (newActiveIndex >= currentOpenTabs.length) {
+            newActiveIndex = currentOpenTabs.length - 1;
         }
+        setActiveTabId(currentOpenTabs[newActiveIndex] ? currentOpenTabs[newActiveIndex].id : null);
       }
       renderTabsAndEditor();
       showStatus('Note deleted successfully.', 2000);
@@ -319,50 +318,40 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- onAuthStateChanged Listener (now using onAuthChange from service) ---
   onAuthChange(async (user) => {
     if (user) {
-      currentUid = user.uid;
-      currentUserEmail = user.email; // Store email
       try {
-        const docSnap = await getUserProfile(user.uid); // Use firebaseService
+        const docSnap = await getUserProfile(user.uid);
+        let userProfileData;
         if (docSnap.exists()) {
-          const profile = docSnap.data();
-          currentUserRole = profile.role || "client";
-          currentUserIsActive = typeof profile.isActive === 'boolean' ? profile.isActive : true;
-          // Call uiManager's updateAppUIForAuthState, passing necessary state
-          updateAppUIForAuthState(user, profile, notesCache, openTabs, activeTabId);
-          if (currentUserIsActive) {
-            loadInitialNotes();
-          }
+          userProfileData = docSnap.data();
         } else {
           console.warn("User profile not found in Firestore for UID:", user.uid);
-          currentUserRole = "client";
-          currentUserIsActive = true;
-          const userProfileData = { email: user.email, uid: user.uid, role: "client", isActive: true };
+          userProfileData = { email: user.email, uid: user.uid, role: "client", isActive: true };
           await createUserProfile(user.uid, userProfileData); 
-          updateAppUIForAuthState(user, userProfileData, notesCache, openTabs, activeTabId);
-          if (currentUserIsActive) loadInitialNotes();
           showStatus('User profile created.', 2000);
+        }
+        setCurrentUser({ // Use stateManager
+          uid: user.uid, 
+          email: userProfileData.email, 
+          role: userProfileData.role || "client", 
+          isActive: typeof userProfileData.isActive === 'boolean' ? userProfileData.isActive : true
+        });
+        // Pass state via getters to uiManager function
+        updateAppUIForAuthState(user, userProfileData, getNotesCache(), getOpenTabs(), getActiveTabId());
+        if (isCurrentUserActive()) { // Use getter
+          loadInitialNotes();
         }
       } catch (error) {
         console.error("Error fetching/creating user profile:", error);
-        currentUserRole = "client"; currentUserIsActive = false;
-        updateAppUIForAuthState(user, { isActive: false, email: user.email }, notesCache, openTabs, activeTabId);
+        setCurrentUser({ uid: user.uid, email: user.email, role: "client", isActive: false }); // Update state
+        updateAppUIForAuthState(user, { isActive: false, email: user.email }, getNotesCache(), getOpenTabs(), getActiveTabId());
         showStatus('Error with user profile.', 0, true);
       }
     } else {
-      currentUid = null;
-      currentUserEmail = null;
-      currentUserRole = null;
-      currentUserIsActive = false;
-      // Clear state before updating UI for logged-out user
-      notesCache = {}; 
-      openTabs = []; 
-      activeTabId = null;
-      clearEditorFields();
-      updateAppUIForAuthState(null, null, notesCache, openTabs, activeTabId);
+      resetUserState(); // Use stateManager to clear all user and notes state
+      clearEditorFields(); // uiManager
+      // Pass current (cleared) state to uiManager function
+      updateAppUIForAuthState(null, null, getNotesCache(), getOpenTabs(), getActiveTabId());
       showStatus('Please sign in or sign up.', 0);
-      // These might be redundant if updateAppUIForAuthState handles them for null user
-      // userInfoPanel.style.display = 'none'; 
-      // noteEditorArea.style.display = 'block';
     }
   });
 
@@ -374,12 +363,12 @@ document.addEventListener('DOMContentLoaded', function () {
   noteContentInput.addEventListener('input', autoSaveNote);
 
   userSettingsTabButton.addEventListener('click', () => {
-    if (!currentUserIsActive && !currentUid) { // Do not show panel if not logged in or inactive
+    if (!isCurrentUserActive() && !getCurrentUid()) { // Use getters
         showStatus("Please log in to see user settings.", 2000, true);
         return;
     }
     if (userInfoPanel.style.display === 'none') {
-      userInfoEmail.textContent = currentUserEmail || 'N/A';
+      userInfoEmail.textContent = getCurrentUserEmail() || 'N/A'; // Use getter
       userInfoPanel.style.display = 'block';
       noteEditorArea.style.display = 'none';
     } else {
