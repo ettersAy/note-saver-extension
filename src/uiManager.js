@@ -124,69 +124,82 @@ export function toggleAuthFormsDisplay(showLogin) {
   }
 }
 
+// --- Internal Helper Functions for updateAppUIForAuthState ---
+function _setupUIForActiveUser() {
+  authSection.style.display = 'none';
+  mainAppContent.style.display = 'flex';
+  userStatusInTabBar.style.display = 'flex';
+
+  noteTitleInput.disabled = false;
+  noteContentInput.disabled = false;
+  newNoteTabButton.disabled = false;
+  userSettingsTabButton.style.display = 'list-item';
+  noteEditorArea.style.display = 'block';
+  userInfoPanel.style.display = 'none';
+  // deleteNoteAction state is handled by loadNoteIntoEditor
+}
+
+function _setupUIForInactiveUser() {
+  authSection.style.display = 'none';
+  mainAppContent.style.display = 'flex';
+  userStatusInTabBar.style.display = 'flex';
+  
+  const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
+  noteTabElements.forEach(el => el.remove());
+  const liMessage = document.createElement('li');
+  liMessage.style.padding = '10px';
+  liMessage.style.color = '#777';
+  liMessage.textContent = 'Your account is inactive. Please contact admin.';
+  const firstActionButton = tabsListUL.querySelector('.tab-action-button');
+  if (firstActionButton) {
+      tabsListUL.insertBefore(liMessage, firstActionButton);
+  } else {
+      tabsListUL.appendChild(liMessage);
+  }
+
+  noteTitleInput.disabled = true;
+  noteContentInput.disabled = true;
+  deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
+  newNoteTabButton.disabled = true;
+  userSettingsTabButton.style.display = 'list-item'; // For logout
+  noteEditorArea.style.display = 'block'; 
+  userInfoPanel.style.display = 'none';
+  showStatus('Account inactive.', 0, true);
+}
+
+function _setupUIForLoggedOutState() {
+  authSection.style.display = 'block';
+  mainAppContent.style.display = 'none';
+  userStatusInTabBar.style.display = 'none';
+  toggleAuthFormsDisplay(true); // Show login form by default
+
+  const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
+  noteTabElements.forEach(el => el.remove()); // Clear tabs
+
+  noteTitleInput.disabled = true;
+  noteContentInput.disabled = true;
+  deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
+  newNoteTabButton.disabled = true;
+  userSettingsTabButton.style.display = 'none';
+  noteEditorArea.style.display = 'block'; // Reset
+  userInfoPanel.style.display = 'none'; // Reset
+}
+
 export function updateAppUIForAuthState(user, profile, notesCache, openTabs, activeTabId) {
-  // Guard against missing DOM elements
-  if (!authSection || !mainAppContent || !userStatusInTabBar || !noteTitleInput || !noteContentInput || !newNoteTabButton || !userSettingsTabButton || !tabsListUL || !deleteNoteAction || !noteEditorArea || !userInfoPanel) {
-    console.error("One or more critical DOM elements missing for UI update.");
+  // Guard against missing DOM elements - this check is crucial
+  if (!authSection || !mainAppContent || !userStatusInTabBar || !noteTitleInput || !noteContentInput || 
+      !newNoteTabButton || !userSettingsTabButton || !tabsListUL || !deleteNoteAction || 
+      !noteEditorArea || !userInfoPanel || !loginForm || !signupForm) {
+    console.error("One or more critical DOM elements missing for UI update in updateAppUIForAuthState.");
     return;
   }
 
   if (user && profile && profile.isActive) {
-    authSection.style.display = 'none';
-    mainAppContent.style.display = 'flex';
-    userStatusInTabBar.style.display = 'flex';
-
-    noteTitleInput.disabled = false;
-    noteContentInput.disabled = false;
-    newNoteTabButton.disabled = false;
-    userSettingsTabButton.style.display = 'list-item';
-    noteEditorArea.style.display = 'block';
-    userInfoPanel.style.display = 'none';
-    // Ensure delete action is enabled/disabled based on current note in loadNoteIntoEditor
+    _setupUIForActiveUser();
   } else if (user && profile && !profile.isActive) {
-    authSection.style.display = 'none';
-    mainAppContent.style.display = 'flex';
-    userStatusInTabBar.style.display = 'flex';
-    
-    const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-    noteTabElements.forEach(el => el.remove());
-    const liMessage = document.createElement('li');
-    liMessage.style.padding = '10px';
-    liMessage.style.color = '#777';
-    liMessage.textContent = 'Your account is inactive. Please contact admin.';
-    const firstActionButton = tabsListUL.querySelector('.tab-action-button');
-    if (firstActionButton) {
-        tabsListUL.insertBefore(liMessage, firstActionButton);
-    } else {
-        tabsListUL.appendChild(liMessage);
-    }
-    // State clearing (notesCache, openTabs, activeTabId) should happen in popup.js before calling this
-
-    noteTitleInput.disabled = true;
-    noteContentInput.disabled = true;
-    deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
-    newNoteTabButton.disabled = true;
-    userSettingsTabButton.style.display = 'list-item'; // Still show for logout
-    noteEditorArea.style.display = 'block'; 
-    userInfoPanel.style.display = 'none';
-    showStatus('Account inactive.', 0, true);
+    _setupUIForInactiveUser();
   } else { // Logged out
-    authSection.style.display = 'block';
-    mainAppContent.style.display = 'none';
-    userStatusInTabBar.style.display = 'none';
-    toggleAuthFormsDisplay(true);
-
-    const noteTabElements = tabsListUL.querySelectorAll('li:not(.tab-action-button)');
-    noteTabElements.forEach(el => el.remove());
-    // State clearing (notesCache, openTabs, activeTabId) should happen in popup.js
-
-    noteTitleInput.disabled = true;
-    noteContentInput.disabled = true;
-    deleteNoteAction.style.pointerEvents = 'none'; deleteNoteAction.style.opacity = '0.5';
-    newNoteTabButton.disabled = true;
-    userSettingsTabButton.style.display = 'none';
-    noteEditorArea.style.display = 'block';
-    userInfoPanel.style.display = 'none';
+    _setupUIForLoggedOutState();
   }
 }
 
